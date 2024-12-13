@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "findmy-api"
+version = "0.1.0"
+description = "API for Find My items location tracking"
+readme = "README.md"
+authors = ["Loki <yongxiang.zhan@outlook.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+uvicorn = "^0.32.1"
+pydantic = "^2.10.3"
+fastapi = "^0.115.6"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+isort = "^5.13.2"
+flake8 = "^7.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
