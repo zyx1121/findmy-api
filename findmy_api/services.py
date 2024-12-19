@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -6,6 +7,8 @@ from typing import Dict, List, Optional
 from fastapi import HTTPException
 
 from .models import Address, Location
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class FindMyItem:
@@ -15,15 +18,33 @@ class FindMyItem:
             os.path.expanduser("~"),
             "Library/Caches/com.apple.findmy.fmipcore/Items.data",
         )
-        self._load_data()
+        self.raw_data = None
 
     def _load_data(self) -> None:
         """Load Items.data file"""
+        if self.raw_data is not None:
+            return
+
         try:
             with open(self.data_path, "r") as f:
-                self.raw_data = json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError) as e:
-            raise HTTPException(status_code=500, detail=f"Cannot read Items.data: {str(e)}")
+                try:
+                    self.raw_data = json.load(f)
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    error_msg = (
+                        "Unable to parse Find My data. This might be due to "
+                        "encryption in newer macOS versions (>14.3.1). Please "
+                        "ensure you're using a compatible macOS version."
+                    )
+                    logger.error(error_msg)
+                    raise HTTPException(status_code=500, detail=error_msg)
+        except FileNotFoundError:
+            error_msg = "Find My cache file not found. Please ensure Find My is enabled on your system."
+            logger.error(error_msg)
+            raise HTTPException(status_code=500, detail=error_msg)
+        except PermissionError:
+            error_msg = "Permission denied when accessing Find My cache file."
+            logger.error(error_msg)
+            raise HTTPException(status_code=500, detail=error_msg)
 
     def _get_item_data(self, name: str) -> dict:
         """Get the data of a specific item"""
@@ -71,6 +92,7 @@ class FindMyItem:
 
     def get_system_items(self) -> List[str]:
         """Get all items"""
+        self._load_data()
         items = [item["name"] for item in self.raw_data if item.get("name")]
         self.items = {name: None for name in items}
         return items
