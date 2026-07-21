@@ -1,88 +1,69 @@
-# FindMy Items API
+# findmy-api
 
-A FastAPI-based REST API service for tracking Apple Find My Items location information, including AirTag, AirPods, and other Find My Items.
+> Ask "where's my AirTag" over HTTP instead of opening the Find My app.
 
-## Project Background
+`findmy` · `airtag` · `macos` · `fastapi` · `rest-api`
 
-Apple does not provide an official Find My API interface, primarily due to the following considerations:
+[![version](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fzyx1121%2Ffindmy-api%2Fmain%2Fpyproject.toml&query=%24.tool.poetry.version&label=version&color=111111)](pyproject.toml) &nbsp;[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](#license)
 
-- Security: Prevent malicious programs from accessing location information
-- Ecosystem: Maintain exclusive connections between Apple devices
-- Privacy Protection: Ensure confidentiality of user location data
+```
+$ curl http://127.0.0.1:8000/items
+["Keys","iPhone"]
 
-## Solution
-
-This project implements Find My functionality extension through:
-
-1. Direct reading of Find My cache files in macOS system:
-
-```bash
-~/Library/Caches/com.apple.findmy.fmipcore/Items.data
+$ curl http://127.0.0.1:8000/items/Keys/location
+{"latitude":25.033,"longitude":121.5654,"altitude":12.3,"timestamp":"2024-12-19T10:15:00"}
 ```
 
-2. Converting cache data into standardized API format
+<sub>List what Find My is tracking, then pull one item's last known fix.</sub>
 
-3. Providing cross-platform access capability through HTTP protocol
+Apple does not ship an official Find My API: no key, no endpoint, nothing. This project reads the same cache file the Find My app already writes to on macOS and re-serves it as a small local HTTP service, so any script or app on the network can ask for an item's location or address instead of opening Find My by hand.
 
-> [!WARNING]
->
-> - System Requirements: Only supports macOS 14.3.1 or earlier versions
-> - Access Permissions: Requires local file system read permissions
-> - Update Frequency: Depends on system cache update cycle
-
-## Environment Requirements
-
-- `Poetry`: Python dependency management tool
-- macOS system (14.3.1 or earlier)
-- Find My cache file access permissions
-
-## Quick Start
-
-1. Clone the project:
+## Quickstart
 
 ```bash
 git clone https://github.com/zyx1121/findmy-api.git
 cd findmy-api
-```
-
-2. Install dependencies:
-
-```bash
 poetry install
-```
-
-3. Start the service:
-
-```bash
 poetry run uvicorn findmy_api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## API Documentation
+Interactive docs come free: Swagger UI at `/docs`, ReDoc at `/redoc`.
 
-Two interactive API documentation interfaces are provided:
+## What it gives you
 
-- Swagger UI: `http://127.0.0.1:8000/docs`
+- **List** every item Find My is currently tracking
+- **Locate** an item: latitude, longitude, altitude, and when the fix was taken
+- **Resolve** an item's last known street address
 
-  - Suitable for developer testing and interaction
-  - Provides real-time API testing functionality
+## Endpoints
 
-- ReDoc: `http://127.0.0.1:8000/redoc`
+| Method | Path | Returns |
+|--------|------|---------|
+| `GET` | `/items` | `list[str]`: names of every item found in the local cache |
+| `GET` | `/items/{item_name}/location` | `Location`: `latitude`, `longitude`, `altitude`, `timestamp` |
+| `GET` | `/items/{item_name}/address` | `Address`: `country`, `administrative_area`, `locality`, `street_name`, `street_address`, `map_item_full_address` |
 
-  - Provides clearer documentation reading experience
-  - Suitable for API documentation reference
+> [!NOTE]
+> Call `GET /items` at least once first. Item names are only recognized by `/location` and `/address` after `/items` has populated the internal item list; calling either endpoint cold returns a 404.
 
-## DISCLAIMER
+## How it works
 
-This project is for educational and research purposes only. The author:
+macOS writes each paired item's last known position to `~/Library/Caches/com.apple.findmy.fmipcore/Items.data`. This service loads that JSON on first request and answers lookups against it directly, no daemon, no calls out to Apple's servers.
 
-- Takes no responsibility for any misuse or damages
-- Does not guarantee the accuracy or reliability of the data
-- Is not affiliated with Apple Inc.
-- Makes no warranties regarding the use of this software
+> [!WARNING]
+>
+> - System requirement: only supports macOS 14.3.1 or earlier. Newer macOS versions encrypt the cache file and this project cannot parse it.
+> - Needs local file-system read permission on the cache file above.
+> - Data is only as fresh as the last Find My cache write, there is no live polling.
 
-By using this software, you acknowledge that:
+## Disclaimer
 
-- You are using it at your own risk
-- You will comply with Apple's terms of service
-- You will respect user privacy and data protection laws
-- You understand this is not an official Apple product
+For educational and research purposes only. The author takes no responsibility for misuse or damages, makes no guarantee about data accuracy, and is not affiliated with Apple Inc. Using this software means using it at your own risk, complying with Apple's terms of service, and respecting user privacy and data protection laws.
+
+## Contributing
+
+Issues and PRs welcome: start with [CONTRIBUTING.md](https://github.com/zyx1121/.github/blob/main/CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE) · reads a cache file Apple never meant you to see
