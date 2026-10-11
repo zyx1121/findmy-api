@@ -65,23 +65,17 @@ macOS writes the last known position of each item to `~/Library/Caches/com.apple
 
 ## For AI agents
 
-Structured facts for coding agents and LLM tools.
+Facts for coding agents and LLM tools.
 
-```yaml
-name: findmy-api
-summary: FastAPI service that serves the macOS Find My cache file (Items.data) as JSON over HTTP.
-type: service
-interfaces:
-  cli: none
-  mcp: none
-  http: http://127.0.0.1:8000 (GET /items, /items/{name}/location, /items/{name}/address, OpenAPI at /openapi.json)
-install: poetry install
-run: poetry run uvicorn findmy_api.main:app --port 8000
-verify: curl -s http://127.0.0.1:8000/items
-config: []
-secrets: [none, but the responses contain the location of every item, and the API has no authentication]
-limits: [macOS 14.3.1 or earlier, reads Items.data once per process, call /items before /location or /address]
-```
+- **Summary**: FastAPI service that serves the macOS Find My cache file (`Items.data`) as JSON over HTTP.
+- **Type**: service
+- **Interfaces**: HTTP `http://127.0.0.1:8000` with `GET /items`, `/items/{name}/location` and `/items/{name}/address`. OpenAPI is at `/openapi.json`.
+- **Install**: `poetry install`
+- **Run**: `poetry run uvicorn findmy_api.main:app --port 8000`
+- **Verify**: `curl -s http://127.0.0.1:8000/items`
+- **Config**: none
+- **Secrets**: none, but the responses contain the location of every item and the API has no authentication
+- **Limits**: macOS 14.3.1 or earlier only. The service reads `Items.data` once per process. Call `/items` before `/location` or `/address`.
 
 ## Development
 
