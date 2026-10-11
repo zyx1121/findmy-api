@@ -1,12 +1,18 @@
-# findmy-api
+<div align="center">
 
-> Ask "where's my AirTag" over HTTP instead of opening the Find My app.
+<h1>findmy-api</h1>
 
-`findmy` · `airtag` · `macos` · `fastapi` · `rest-api`
+<p><strong>Your AirTag and Find My item locations as a local HTTP API on macOS.</strong></p>
 
-[![version](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fzyx1121%2Ffindmy-api%2Fmain%2Fpyproject.toml&query=%24.tool.poetry.version&label=version&color=111111)](pyproject.toml) &nbsp;[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](#license)
+[![Python](https://img.shields.io/badge/python-3.12%2B-3776ab?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
+[![macOS](https://img.shields.io/badge/macOS-14.3.1_or_earlier-000000?style=flat-square&logo=apple)](#limits)
+[![License](https://img.shields.io/github/license/zyx1121/findmy-api?style=flat-square)](LICENSE)
 
-```
+**English** | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
+
+</div>
+
+```console
 $ curl http://127.0.0.1:8000/items
 ["Keys","iPhone"]
 
@@ -14,56 +20,82 @@ $ curl http://127.0.0.1:8000/items/Keys/location
 {"latitude":25.033,"longitude":121.5654,"altitude":12.3,"timestamp":"2024-12-19T10:15:00"}
 ```
 
-<sub>List what Find My is tracking, then pull one item's last known fix.</sub>
+Apple has no official Find My API. findmy-api reads the cache file that the Find My app writes on macOS. It serves that data over HTTP, so a script can ask where an item is.
 
-Apple does not ship an official Find My API: no key, no endpoint, nothing. This project reads the same cache file the Find My app already writes to on macOS and re-serves it as a small local HTTP service, so any script or app on the network can ask for an item's location or address instead of opening Find My by hand.
+> [!WARNING]
+> It works only on macOS 14.3.1 or earlier. Later versions encrypt the cache file, and findmy-api cannot read it.
 
-## Quickstart
+## Features
 
-```bash
-git clone https://github.com/zyx1121/findmy-api.git
-cd findmy-api
+- **Lists your items**: the name of every item that Find My tracks.
+- **Locates an item**: latitude, longitude, altitude and the time of the last fix.
+- **Resolves an address**: the last known street address of an item.
+
+## Quick start
+
+```sh
+git clone https://github.com/zyx1121/findmy-api && cd findmy-api
 poetry install
-poetry run uvicorn findmy_api.main:app --host 0.0.0.0 --port 8000 --reload
+poetry run uvicorn findmy_api.main:app --port 8000
 ```
 
-Interactive docs come free: Swagger UI at `/docs`, ReDoc at `/redoc`.
+In a second terminal, run `curl http://127.0.0.1:8000/items`. You should see the names of your Find My items.
 
-## What it gives you
-
-- **List** every item Find My is currently tracking
-- **Locate** an item: latitude, longitude, altitude, and when the fix was taken
-- **Resolve** an item's last known street address
-
-## Endpoints
+## Usage
 
 | Method | Path | Returns |
 |--------|------|---------|
-| `GET` | `/items` | `list[str]`: names of every item found in the local cache |
-| `GET` | `/items/{item_name}/location` | `Location`: `latitude`, `longitude`, `altitude`, `timestamp` |
-| `GET` | `/items/{item_name}/address` | `Address`: `country`, `administrative_area`, `locality`, `street_name`, `street_address`, `map_item_full_address` |
+| `GET` | `/items` | the names of all items in the cache |
+| `GET` | `/items/{name}/location` | `latitude`, `longitude`, `altitude`, `timestamp` |
+| `GET` | `/items/{name}/address` | `country`, `administrative_area`, `locality`, `street_name`, `street_address`, `map_item_full_address` |
 
-> [!NOTE]
-> Call `GET /items` at least once first. Item names are only recognized by `/location` and `/address` after `/items` has populated the internal item list; calling either endpoint cold returns a 404.
+Call `/items` first after each start. Until then, `/location` and `/address` return 404 for every name. Swagger UI is at `/docs`.
+
+To reach it from other machines, add `--host 0.0.0.0`. The API has no authentication, so do this only on a network that you trust.
 
 ## How it works
 
-macOS writes each paired item's last known position to `~/Library/Caches/com.apple.findmy.fmipcore/Items.data`. This service loads that JSON on first request and answers lookups against it directly, no daemon, no calls out to Apple's servers.
+macOS writes the last known position of each item to `~/Library/Caches/com.apple.findmy.fmipcore/Items.data`. findmy-api reads that file on the first request and keeps it in memory. It sends nothing to Apple.
 
-> [!WARNING]
->
-> - System requirement: only supports macOS 14.3.1 or earlier. Newer macOS versions encrypt the cache file and this project cannot parse it.
-> - Needs local file-system read permission on the cache file above.
-> - Data is only as fresh as the last Find My cache write, there is no live polling.
+## Limits
+
+- macOS 14.3.1 or earlier only. Later versions encrypt `Items.data`.
+- The data is as old as the last write by the Find My app. Restart the service to read a newer file.
+- The user that runs the service must be able to read the cache file.
+
+## For AI agents
+
+Structured facts for coding agents and LLM tools.
+
+```yaml
+name: findmy-api
+summary: FastAPI service that serves the macOS Find My cache file (Items.data) as JSON over HTTP.
+type: service
+interfaces:
+  cli: none
+  mcp: none
+  http: http://127.0.0.1:8000 (GET /items, /items/{name}/location, /items/{name}/address, OpenAPI at /openapi.json)
+install: poetry install
+run: poetry run uvicorn findmy_api.main:app --port 8000
+verify: curl -s http://127.0.0.1:8000/items
+config: []
+secrets: [none, but the responses contain the location of every item, and the API has no authentication]
+limits: [macOS 14.3.1 or earlier, reads Items.data once per process, call /items before /location or /address]
+```
+
+## Development
+
+```sh
+poetry install
+poetry run uvicorn findmy_api.main:app --port 8000 --reload
+```
+
+Use black and isort, both dev dependencies, to format the code. There is no CI and there are no tests yet.
 
 ## Disclaimer
 
-For educational and research purposes only. The author takes no responsibility for misuse or damages, makes no guarantee about data accuracy, and is not affiliated with Apple Inc. Using this software means using it at your own risk, complying with Apple's terms of service, and respecting user privacy and data protection laws.
-
-## Contributing
-
-Issues and PRs welcome: start with [CONTRIBUTING.md](https://github.com/zyx1121/.github/blob/main/CONTRIBUTING.md).
+For education and research only. This project is not affiliated with Apple Inc. You are responsible for compliance with Apple's terms and with privacy law.
 
 ## License
 
-[MIT](LICENSE) · reads a cache file Apple never meant you to see
+[MIT](LICENSE)
